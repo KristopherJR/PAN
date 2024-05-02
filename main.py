@@ -1,13 +1,15 @@
 import os
-import discord
 import pan
 import requests
-
+import discord
+import nacl
 from dotenv import load_dotenv
+from discord.ext import commands
+from discord import FFmpegPCMAudio
 
 async def process_message(message):
     try:
-        bot_response = pan.handle_user_messages(message.content)
+        bot_response = await pan.handle_user_messages(message)
         if bot_response:
             await message.channel.send(bot_response)
     except Exception as error:
@@ -17,7 +19,9 @@ def run_bot():
     load_dotenv()
     TOKEN = os.getenv("DISCORD_TOKEN")
     GUILD = os.getenv("DISCORD_GUILD")
-    client = discord.Client(intents=discord.Intents.all())
+
+    client = commands.Bot(command_prefix='.', intents=discord.Intents.all())
+    voice = discord.VoiceChannel
 
     @client.event
     async def on_ready():
@@ -37,7 +41,6 @@ def run_bot():
     async def on_message(message):
         if (message.author == client.user):
             return
-
         await process_message(message)
 
     client.run(TOKEN)
