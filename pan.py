@@ -1,33 +1,47 @@
 import os
-import pan
-import requests
 import discord
-import nacl
-import asyncio
-import random
+import league
+import sound
+import discord
 from dotenv import load_dotenv
-from discord import FFmpegPCMAudio
+from discord.ext import commands
 
-async def play_sfx(channel, sfx_path):
-    vc = await channel.connect()
-    print(f'Joined {channel.name}!')
+def run_bot():
+    load_dotenv()
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    GUILD = os.getenv("DISCORD_GUILD")
 
-    ffmpeg_options = {
-        'executable': os.getenv("FFMPEG")
-    }
+    bot = commands.Bot(command_prefix='/',intents=discord.Intents.all())
 
-    audio = discord.FFmpegPCMAudio(sfx_path, **ffmpeg_options)
-    vc.play(audio)
-    # Wait until the audio has finished playing
-    while vc.is_playing():
-        await asyncio.sleep(1)
-    # Disconnect from the voice channel once the audio has finished playing
-    await vc.disconnect()
-    print(f'Disconnected from {channel.name}!')
+    @bot.event
+    async def on_ready():
+        guild = discord.utils.get(bot.guilds, name=GUILD)
 
+        print(
+            f"{bot.user} is connected to the following guild:\n"
+            f"{guild.name}(id: {guild.id})"
+        )
 
-def random_gragas_sfx() -> str:
-    return f'audio/gragas-{random.randint(1,5)}.mp3'
+    @bot.event
+    async def on_member_join(member):
+        await member.create_dm()
+        await member.dm_channel.send(f"{member.name}... Need some Grog...")
+
+    @bot.event
+    async def on_message(message):
+        if (message.author == bot.user):
+            return
+        await process_message(message)
+
+    bot.run(TOKEN)
+
+async def process_message(message):
+    try:
+        bot_response = await handle_user_messages(message)
+        if bot_response:
+            await message.channel.send(bot_response)
+    except Exception as error:
+        print(error)
 
 async def handle_user_messages(msg) -> str:
     response = ""
@@ -38,43 +52,27 @@ async def handle_user_messages(msg) -> str:
 
         match command:
             case "/grog":
-                channel = msg.author.voice.channel
-                if channel:
-                    await play_sfx(channel, random_gragas_sfx())
+                if msg.author.voice: #If the user that sent the command is in a voice channel
+                    await sound.play_sfx(msg.author.voice.channel, sound.random_gragas_sfx())
                 else:
                     response = "Mmm... need some."
             case "/game":
                 if len(message_parts) > 1:
-                    summoner_name = msg.replace("/game ", "")
-                    response = get_live_game(summoner_name)
+                    summoner_name = msg.content.replace("/game ", "")
+                    response = league.get_live_game(summoner_name)
                 else:
                     response = "Give me a summoner name, bub."
-    
+            case "/register":
+                if len(message_parts) > 2:
+                    tag = message_parts[-1]
+                    summoner_name = " ".join(message_parts[1:][:-1])
+                    response = league.register(summoner_name, tag)
+                else:
+                    response = "I'm gonna need your summoner name and tag, chief! `/register name tag`"
+
     return response
 
 def validate_message(msg) -> bool:
     return msg.count('/') == 1
 
-def get_riot_api_token() -> str:
-    return os.getenv("RIOT_API_TOKEN")
-
-def get_live_game(summoner_name) -> str:
-    puuid = get_puuid(summoner_name)
-    token = get_riot_api_token()
-    response = requests.get(f"https://euw1.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/{puuid}", headers={"X-Riot-Token": token})
-
-    if (response.status_code == 404):
-        return f"{summoner_name} is not currently in a game. What are you stupid?"
-    if (response.status_code == 200):
-        return response.content
-
-def get_puuid(summoner_name) -> str:
-    match summoner_name.lower():
-        case "trinityburst":
-            return "NawRoKFxfqWRCNvFRXSMDYGVaJQYsiLRpaNeIisdeMyy-3tJqS-YntU-zv15XVeoehmUVTEdtJfPCQ"
-        case "somnus":
-            return "3SkR0ZxsiB4mSK1sNt7lyHIdd_5gU0lVLxC3aJzsD9Ics7v7ijCGYU8v-yWwE289vZAM_gIE14y0wA"
-        case "wheels":
-            return "J_ZQ5LcyQ2bKPc0sdX0O7hZXLZBqiXO2pbrdjV6xAHW76oFBsHwAXSIwNqvSWf5--J2VS7aaTY7U7Q"
-        case "smol keigo":
-            return "J-PuAH8-ty3o1d_PrkDe4Ip8bY2lQmpndBr8dmAnLYdcg0C4wUtTCUMtKsixgUfsqn5PpBgdWrsebA"
+run_bot()
