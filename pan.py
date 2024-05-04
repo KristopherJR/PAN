@@ -68,7 +68,7 @@ async def handle_user_messages(msg) -> str:
                     summoner_name = " ".join(message_parts[1:][:-1])
                     response = league.register(summoner_name, tag)
                 else:
-                    response = "I'm gonna need your summoner name and tag, chief! `/register name tag`"
+                    response = "I'm gonna need a summoner name and tag, chief!\n\nCommand: `/register summoner_name tag`"
 
     return response
 
